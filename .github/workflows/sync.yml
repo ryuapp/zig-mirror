@@ -1,0 +1,47 @@
+name: Sync from Codeberg
+
+on:
+  schedule:
+    # Run daily at 00:00 UTC (09:00 JST)
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add Codeberg remote
+        run: |
+          git remote add codeberg https://codeberg.org/ziglang/zig.git || true
+          git remote -v
+
+      - name: Fetch from Codeberg
+        run: |
+          git fetch codeberg master --force
+
+      - name: Sync master branch
+        run: |
+          cp -r .github /tmp/github-backup
+          git reset --hard codeberg/master
+          rm -rf .github
+          cp -r /tmp/github-backup .github
+          git add .github
+          git commit -m "Add GitHub Actions sync workflow" || true
+
+      - name: Push to GitHub
+        run: |
+          git push origin master --force
